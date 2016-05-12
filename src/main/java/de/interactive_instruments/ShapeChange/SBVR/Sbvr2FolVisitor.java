@@ -42,6 +42,7 @@ import java.util.Stack;
 import java.util.TreeSet;
 
 import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.tree.TerminalNode;
 
 import de.interactive_instruments.ShapeChange.Options;
 import de.interactive_instruments.ShapeChange.Type;
@@ -69,6 +70,7 @@ import de.interactive_instruments.ShapeChange.FOL.SchemaCall;
 import de.interactive_instruments.ShapeChange.FOL.StringLiteral;
 import de.interactive_instruments.ShapeChange.FOL.StringLiteralList;
 import de.interactive_instruments.ShapeChange.FOL.Variable;
+import de.interactive_instruments.ShapeChange.FOL.FunctionBinaryComparisonPredicate;
 import de.interactive_instruments.ShapeChange.Model.ClassInfo;
 import de.interactive_instruments.ShapeChange.Model.FolConstraint;
 import de.interactive_instruments.ShapeChange.Model.Model;
@@ -87,12 +89,16 @@ import de.interactive_instruments.antlr.sbvr.SBVRParser.AtMostOneQuantifierConte
 import de.interactive_instruments.antlr.sbvr.SBVRParser.ComparisonPredicateContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.ConditionInSentenceUsingObligationContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.ConditionInSentenceUsingShallContext;
+import de.interactive_instruments.antlr.sbvr.SBVRParser.ContainsContext;
+import de.interactive_instruments.antlr.sbvr.SBVRParser.CrossesContext;
+import de.interactive_instruments.antlr.sbvr.SBVRParser.DisjointContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.EqualToContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.ExactlyNQuantifierContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.ExactlyOneQuantifierContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.ExistentialQuantifierContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.HigherOrEqualToContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.HigherThanContext;
+import de.interactive_instruments.antlr.sbvr.SBVRParser.IntersectsContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.LowerOrEqualToContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.LowerThanContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.NameExprContext;
@@ -100,6 +106,7 @@ import de.interactive_instruments.antlr.sbvr.SBVRParser.NumberContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.NumericRangeQuantifierContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.OfTypePredicateContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.OtherThanContext;
+import de.interactive_instruments.antlr.sbvr.SBVRParser.OverlapsContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.PredicateContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.PrefixedPredicateContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.QuantificationContext;
@@ -110,8 +117,11 @@ import de.interactive_instruments.antlr.sbvr.SBVRParser.SentenceContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.SentenceUsingObligationContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.SentenceUsingShallContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.SinglePredicateContext;
+import de.interactive_instruments.antlr.sbvr.SBVRParser.SpatiallyEqualsContext;
+import de.interactive_instruments.antlr.sbvr.SBVRParser.TouchesContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.UniversalQuantifierContext;
 import de.interactive_instruments.antlr.sbvr.SBVRParser.VerbExprContext;
+import de.interactive_instruments.antlr.sbvr.SBVRParser.WithinContext;
 
 /**
  * Encapsulates the logic to parse First Order Logic expressions from an SBVR
@@ -121,6 +131,8 @@ import de.interactive_instruments.antlr.sbvr.SBVRParser.VerbExprContext;
  *
  */
 public class Sbvr2FolVisitor extends SBVRBaseVisitor<FolExpression> {
+	
+	private static String GEO_FUNCTION_PREFIX = "geo:";
 
 	private Stack<Variable> scopes = new Stack<Variable>();
 
@@ -1667,9 +1679,11 @@ public class Sbvr2FolVisitor extends SBVRBaseVisitor<FolExpression> {
 
 			exprRight = this.visitNameExpr(ctx.nameExpr());
 
-		} else {
+		} else if (ctx.number() != null) {
 
 			exprRight = this.visitNumber(ctx.number());
+		} else {
+			exprRight = this.visitWktGeometry(ctx.GEOMETRY());
 		}
 
 		// set expressions
@@ -1698,6 +1712,13 @@ public class Sbvr2FolVisitor extends SBVRBaseVisitor<FolExpression> {
 
 			throw new SbvrParsingException(error);
 		}
+	}
+
+	private Expression visitWktGeometry(TerminalNode ctx) {
+		StringLiteral sl = new StringLiteral();
+		String s = ctx.getText();
+		sl.setValue(s.substring(1, s.length() - 1));
+		return sl;
 	}
 
 	@Override
@@ -1748,6 +1769,48 @@ public class Sbvr2FolVisitor extends SBVRBaseVisitor<FolExpression> {
 
 			return sll;
 		}
+	}
+	
+	
+
+	@Override
+	public FunctionBinaryComparisonPredicate visitWithin(WithinContext ctx) {
+		return new FunctionBinaryComparisonPredicate(GEO_FUNCTION_PREFIX + "within");
+	}
+
+	@Override
+	public FolExpression visitContains(ContainsContext ctx) {
+		return new FunctionBinaryComparisonPredicate(GEO_FUNCTION_PREFIX + "contains");
+	}
+
+	@Override
+	public FolExpression visitDisjoint(DisjointContext ctx) {
+		return new FunctionBinaryComparisonPredicate(GEO_FUNCTION_PREFIX + "disjoint");
+	}
+
+	@Override
+	public FolExpression visitTouches(TouchesContext ctx) {
+		return new FunctionBinaryComparisonPredicate(GEO_FUNCTION_PREFIX + "touches");
+	}
+
+	@Override
+	public FolExpression visitOverlaps(OverlapsContext ctx) {
+		return new FunctionBinaryComparisonPredicate(GEO_FUNCTION_PREFIX + "overlaps");
+	}
+
+	@Override
+	public FolExpression visitCrosses(CrossesContext ctx) {
+		return new FunctionBinaryComparisonPredicate(GEO_FUNCTION_PREFIX + "crosses");
+	}
+
+	@Override
+	public FolExpression visitIntersects(IntersectsContext ctx) {
+		return new FunctionBinaryComparisonPredicate(GEO_FUNCTION_PREFIX + "intersects");
+	}
+
+	@Override
+	public FolExpression visitSpatiallyEquals(SpatiallyEqualsContext ctx) {
+		return new FunctionBinaryComparisonPredicate(GEO_FUNCTION_PREFIX + "equals");
 	}
 
 	@Override

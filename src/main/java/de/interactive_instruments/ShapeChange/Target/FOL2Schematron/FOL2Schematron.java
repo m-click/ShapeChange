@@ -71,6 +71,7 @@ import de.interactive_instruments.ShapeChange.FOL.BinaryComparisonPredicate;
 import de.interactive_instruments.ShapeChange.FOL.ClassLiteral;
 import de.interactive_instruments.ShapeChange.FOL.EqualTo;
 import de.interactive_instruments.ShapeChange.FOL.FolExpression;
+import de.interactive_instruments.ShapeChange.FOL.FunctionBinaryComparisonPredicate;
 import de.interactive_instruments.ShapeChange.FOL.HigherOrEqualTo;
 import de.interactive_instruments.ShapeChange.FOL.HigherThan;
 import de.interactive_instruments.ShapeChange.FOL.IsNull;
@@ -86,10 +87,10 @@ import de.interactive_instruments.ShapeChange.FOL.SchemaCall;
 import de.interactive_instruments.ShapeChange.FOL.Variable;
 import de.interactive_instruments.ShapeChange.Model.ClassInfo;
 import de.interactive_instruments.ShapeChange.Model.Constraint;
+import de.interactive_instruments.ShapeChange.Model.FolConstraint;
 import de.interactive_instruments.ShapeChange.Model.Model;
 import de.interactive_instruments.ShapeChange.Model.PackageInfo;
 import de.interactive_instruments.ShapeChange.Model.PropertyInfo;
-import de.interactive_instruments.ShapeChange.Model.FolConstraint;
 import de.interactive_instruments.ShapeChange.Target.Target;
 import de.interactive_instruments.ShapeChange.Target.FOL2Schematron.FolSchematronNode.AttributeNode;
 import de.interactive_instruments.ShapeChange.Target.FOL2Schematron.FolSchematronNode.VariableNode;
@@ -792,6 +793,10 @@ public class FOL2Schematron implements Target, MessageSource {
 
 			scn = translateIsTypeOf((IsTypeOf) folExpr, enclosing);
 
+		} else if (folExpr instanceof FunctionBinaryComparisonPredicate) {
+
+			scn = translateFunctionBinaryComparisonPredicate((FunctionBinaryComparisonPredicate) folExpr, enclosing);
+
 		} else {
 			// Anything unknown
 			if (folExpr == null) {
@@ -811,6 +816,20 @@ public class FOL2Schematron implements Target, MessageSource {
 
 		return scn;
 	}
+		
+	private FolSchematronNode translateFunctionBinaryComparisonPredicate(FunctionBinaryComparisonPredicate fol, FolSchematronNode enclosing) {
+		// Create the Comparison
+		FolSchematronNode.ComparisonNode scn = new FolSchematronNode.ComparisonNode(this, fol.getFuncName(), false);
+		// Compute and add the operands
+		scn.addChild(translateConstraint(fol.getExprLeft(), null));
+		scn.addChild(translateConstraint(fol.getExprRight(), null));
+
+		// If there is an enclosing logic, add the created Comparison
+		if (enclosing != null)
+			enclosing.addChild(scn);
+		return scn;
+	}
+
 
 	private FolSchematronNode translateIsTypeOf(IsTypeOf folExpr,
 			FolSchematronNode enclosing) {

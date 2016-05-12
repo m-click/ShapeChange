@@ -640,7 +640,9 @@ public abstract class FolSchematronNode {
 	public static class ComparisonNode extends FolSchematronNode {
 
 		// The relational operator
-		String opname;
+		final String opname;
+		
+		final boolean infix;
 
 		/**
 		 * Ctor
@@ -651,8 +653,13 @@ public abstract class FolSchematronNode {
 		 *            One of =, <>, <, <=, >, >=
 		 */
 		public ComparisonNode(FOL2Schematron schemaObject, String name) {
+			this(schemaObject, name, true);
+		}
+
+		public ComparisonNode(FOL2Schematron schemaObject, String name, boolean infix) {
 			this.schemaObject = schemaObject;
 			opname = name.equals("<>") ? "!=" : name;
+			this.infix  = infix;
 		}
 
 		/**
@@ -685,7 +692,7 @@ public abstract class FolSchematronNode {
 
 				child_xpt[i] = child.translate(ctx);
 
-				if (child.hasIdentity()) {
+				if (child.hasIdentity() && (opname.equals("=") || opname.equals("!="))) {
 					child_xpt[i].fragment = "generate-id("
 							+ child_xpt[i].fragment + ")";
 					child_xpt[i].priority = 11;
@@ -703,7 +710,11 @@ public abstract class FolSchematronNode {
 
 			// Construct the result
 			String op2 = child_xpt[0].merge(child_xpt[1]);
-			child_xpt[0].fragment += " " + opname + " " + op2;
+			if (infix) {
+				child_xpt[0].fragment += " " + opname + " " + op2;
+			} else {
+				child_xpt[0].fragment = opname + "(" + child_xpt[0].fragment + ", " + op2 + ")";
+			}
 			child_xpt[0].type = XpathType.BOOLEAN;
 			child_xpt[0].priority = refprio;
 
